@@ -3,22 +3,25 @@ import datetime
 import json
 import psycopg2
 import os
+import time
 
 DB_CONFIG = {
     "host": os.environ["DB_HOST"],
     "port": os.environ["DB_PORT"],
-    "name": os.environ["DB_NAME"],
+    "database": os.environ["DB_DATABASE"],
     "user": os.environ["DB_USER"],
     "password": os.environ["DB_PASSWORD"]
 }
 
-connection = psycopg2.connect(
-    database=DB_CONFIG["name"],
-    host=DB_CONFIG["host"],
-    port=DB_CONFIG["port"],
-    user=DB_CONFIG["user"],
-    password=DB_CONFIG["password"]
-)
+for i in range(10):
+    try:
+        connection = psycopg2.connect(**DB_CONFIG)
+        break
+    except psycopg2.OperationalError:
+        time.sleep(1)
+else:
+    raise RuntimeError("Database is not available")
+
 cursor = connection.cursor()
 
 cursor.execute("""
