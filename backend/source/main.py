@@ -2,9 +2,39 @@ from flask import Flask, request
 import datetime
 import json
 import psycopg2
+import os
 
-connection = psycopg2.connect(database="WeatherApp", host="localhost", port=5432)
+DB_CONFIG = {
+    "host": os.environ["DB_HOST"],
+    "port": os.environ["DB_PORT"],
+    "name": os.environ["DB_NAME"],
+    "user": os.environ["DB_USER"],
+    "password": os.environ["DB_PASSWORD"]
+}
+
+connection = psycopg2.connect(
+    database=DB_CONFIG["name"],
+    host=DB_CONFIG["host"],
+    port=DB_CONFIG["port"],
+    user=DB_CONFIG["user"],
+    password=DB_CONFIG["password"]
+)
 cursor = connection.cursor()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS weather_readings (
+        id            BIGSERIAL PRIMARY KEY,
+        station_id    TEXT NOT NULL,
+
+        measured_at   TIMESTAMPTZ NOT NULL,
+        received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+        temperature_c NUMERIC(3, 1),
+        humidity_pct  NUMERIC(3, 1),
+        pressure_hpa  NUMERIC(5, 1)
+    );
+""")
+connection.commit()
 
 app = Flask(__name__)
 
