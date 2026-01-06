@@ -10,10 +10,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
     ports:
-      - "5433:5432"
+      - "5433:5432" # Host port set to 5433 in case there already is PostgreSQL database running on host machine
 
   app:
-    build: .
+    build: ./app
     command: flask run
     ports:
       - "8000:8000"
@@ -29,7 +29,7 @@ services:
       DB_USER: weather
       DB_PASSWORD: weather
     volumes:
-      - .:/app
+      - ./app:/app
     depends_on:
       - db
 
