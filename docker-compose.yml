@@ -1,0 +1,37 @@
+name: weatherapp
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    ports:
+      - "5433:5432" # Host port set to 5433 in case there already is PostgreSQL database running on host machine
+
+  app:
+    build: ./app
+    command: flask run
+    ports:
+      - "8000:8000"
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: 1
+      FLASK_RUN_HOST: 0.0.0.0
+      FLASK_RUN_PORT: 8000
+      FLASK_APP: main
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
