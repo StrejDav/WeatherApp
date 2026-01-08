@@ -61,7 +61,7 @@ def ingest():
     retMessage = {"status": "ok", "status_message": "Data succesfully recorded", "timestamp": received_at}
     
     try:
-        parser.isoparse(data['timestamp'])
+        timestamp_dt = parser.isoparse(data['timestamp'])
     except (ValueError, TypeError):
         retMessage["status"] = "error"
         retMessage["status_message"] = "Invalid timestamp format. Use ISO 8601 with timezone."
@@ -72,7 +72,7 @@ def ingest():
             INSERT INTO weather_readings (station_id, measured_at, received_at, temperature_c, humidity_pct, pressure_hpa)
             VALUES (%s, %s, %s, %s, %s, %s);
             """,
-            (data['station_id'], data['timestamp'], received_at, data['temperature_c'], data['humidity_pct'], data['press_hpa']
+            (data['station_id'], timestamp_dt, received_at, data['temperature_c'], data['humidity_pct'], data['press_hpa']
         ))
     except KeyError:
         retMessage["status"] = "error"
@@ -114,6 +114,7 @@ def range():
         # Parse ISO 8601 timestamps with timezone
         from_dt = parser.isoparse(from_ts)
         to_dt = parser.isoparse(to_ts)
+        print(from_dt, flush=True)
     except (ValueError, TypeError):
         return {
             "error": "Invalid timestamp format. Use ISO 8601 with timezone."
