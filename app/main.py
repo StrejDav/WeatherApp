@@ -6,41 +6,53 @@ import os
 import time
 from dateutil import parser
 
-DB_CONFIG = {
-    "host": os.environ["DB_HOST"],
-    "port": os.environ["DB_PORT"],
-    "database": os.environ["DB_DATABASE"],
-    "user": os.environ["DB_USER"],
-    "password": os.environ["DB_PASSWORD"]
-}
+cursor = None
+connection = None
 
-for i in range(10):
-    try:
-        connection = psycopg2.connect(**DB_CONFIG)
-        break
-    except psycopg2.OperationalError:
-        time.sleep(1)
-else:
-    raise RuntimeError("Database is not available")
+def connect_to_db():
+    global cursor
+    global connection
+    DB_CONFIG = {
+        "host": os.environ["DB_HOST"],
+        "port": os.environ["DB_PORT"],
+        "database": os.environ["DB_DATABASE"],
+        "user": os.environ["DB_USER"],
+        "password": os.environ["DB_PASSWORD"]
+    }
+    print(DB_CONFIG, flush=True)
 
-cursor = connection.cursor()
+    for i in range(10):
+        try:
+            connection = psycopg2.connect(**DB_CONFIG)
+            break
+        except psycopg2.OperationalError:
+            time.sleep(1)
+    else:
+        raise RuntimeError("Database is not available")
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS weather_readings (
-        id            BIGSERIAL PRIMARY KEY,
-        station_id    TEXT NOT NULL,
+    cursor = connection.cursor()
 
-        measured_at   TIMESTAMPTZ NOT NULL,
-        received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+def create_table():
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS weather_readings (
+            id            BIGSERIAL PRIMARY KEY,
+            station_id    TEXT NOT NULL,
 
-        temperature_c NUMERIC(3, 1),
-        humidity_pct  NUMERIC(3, 1),
-        pressure_hpa  NUMERIC(5, 1)
-    );
-""")
-connection.commit()
+            measured_at   TIMESTAMPTZ NOT NULL,
+            received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+            temperature_c NUMERIC(3, 1),
+            humidity_pct  NUMERIC(3, 1),
+            pressure_hpa  NUMERIC(5, 1)
+        );
+    """)
+    connection.commit()
 
 app = Flask(__name__)
+
+with app.app_context():
+    connect_to_db()
+    create_table()
 
 @app.route("/ingest", methods=['POST'])
 def ingest():
