@@ -1,64 +1,85 @@
 from flask import Flask, request
-import datetime
+from datetime import datetime
 import json
 import psycopg2
 import os
 import time
+from dateutil import parser
 
-DB_CONFIG = {
-    "host": os.environ["DB_HOST"],
-    "port": os.environ["DB_PORT"],
-    "database": os.environ["DB_DATABASE"],
-    "user": os.environ["DB_USER"],
-    "password": os.environ["DB_PASSWORD"]
-}
+cursor = None
+connection = None
 
-for i in range(10):
-    try:
-        connection = psycopg2.connect(**DB_CONFIG)
-        break
-    except psycopg2.OperationalError:
-        time.sleep(1)
-else:
-    raise RuntimeError("Database is not available")
+def connect_to_db():
+    global cursor
+    global connection
+    DB_CONFIG = {
+        "host": os.environ["DB_HOST"],
+        "port": os.environ["DB_PORT"],
+        "database": os.environ["DB_DATABASE"],
+        "user": os.environ["DB_USER"],
+        "password": os.environ["DB_PASSWORD"]
+    }
+    print(DB_CONFIG, flush=True)
 
-cursor = connection.cursor()
+    for i in range(10):
+        try:
+            connection = psycopg2.connect(**DB_CONFIG)
+            break
+        except psycopg2.OperationalError:
+            time.sleep(1)
+    else:
+        raise RuntimeError("Database is not available")
 
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS weather_readings (
-        id            BIGSERIAL PRIMARY KEY,
-        station_id    TEXT NOT NULL,
+    cursor = connection.cursor()
 
-        measured_at   TIMESTAMPTZ NOT NULL,
-        received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+def create_table():
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS weather_readings (
+            id            BIGSERIAL PRIMARY KEY,
+            station_id    TEXT NOT NULL,
 
-        temperature_c NUMERIC(3, 1),
-        humidity_pct  NUMERIC(3, 1),
-        pressure_hpa  NUMERIC(5, 1)
-    );
-""")
-connection.commit()
+            measured_at   TIMESTAMPTZ NOT NULL,
+            received_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+            temperature_c NUMERIC(3, 1),
+            humidity_pct  NUMERIC(3, 1),
+            pressure_hpa  NUMERIC(5, 1)
+        );
+    """)
+    connection.commit()
 
 app = Flask(__name__)
 
+with app.app_context():
+    connect_to_db()
+    create_table()
+
 @app.route("/ingest", methods=['POST'])
 def ingest():
-    received_at = datetime.datetime.now().astimezone().isoformat()
+    received_at = datetime.now().astimezone().isoformat()
     data = request.json
-    retMessage = {"status": "ok", "status_message": "Data succesfully recorded","timestamp": received_at}
+    retMessage = {"status": "ok", "status_message": "Data succesfully recorded", "timestamp": received_at}
+    
+    try:
+        timestamp_dt = parser.isoparse(data['timestamp'])
+    except (ValueError, TypeError):
+        retMessage["status"] = "error"
+        retMessage["status_message"] = "Invalid timestamp format. Use ISO 8601 with timezone."
+        return retMessage, 400
+
     try:
         cursor.execute("""
             INSERT INTO weather_readings (station_id, measured_at, received_at, temperature_c, humidity_pct, pressure_hpa)
             VALUES (%s, %s, %s, %s, %s, %s);
             """,
-            (data['station_id'], data['timestamp'], received_at, data['temperature_c'], data['humidity_pct'], data['press_hpa']
+            (data['station_id'], timestamp_dt, received_at, data['temperature_c'], data['humidity_pct'], data['press_hpa']
         ))
     except KeyError:
-        retMessage["status"] = "nok"
+        retMessage["status"] = "error"
         retMessage["status_message"] = "Invalid JSON format"
         return retMessage, 400
     except:
-        retMessage["status"] = "nok"
+        retMessage["status"] = "error"
         retMessage["status_message"] = "Unexpected error"
         return retMessage, 500
     return retMessage, 201
@@ -68,7 +89,7 @@ def latest():
     cursor.execute("SELECT * FROM weather_readings WHERE id=(SELECT max(id) FROM weather_readings);")
     data = cursor.fetchone()
     if data == None:
-        return "No data has yet been ingested", 503
+        return {}, 200
     retData = {
         "station_id": data[1],
         "measured_at": data[2],
@@ -81,4 +102,66 @@ def latest():
 
 @app.route("/range", methods=['GET'])
 def range():
-    return "[Requested range weather data here]"
+    from_ts = request.args.get("from")
+    to_ts = request.args.get("to")
+
+    if not from_ts or not to_ts:
+        return {
+            "error": "Both 'from' and 'to' query parameters are required"
+        }, 400
+
+    try:
+        # Parse ISO 8601 timestamps with timezone
+        from_dt = parser.isoparse(from_ts)
+        to_dt = parser.isoparse(to_ts)
+        print(from_dt, flush=True)
+    except (ValueError, TypeError):
+        return {
+            "error": "Invalid timestamp format. Use ISO 8601 with timezone."
+        }, 400
+
+    if from_dt >= to_dt:
+        return {
+            "error": "'from' must be earlier than 'to'"
+        }, 400
+
+    cursor.execute(
+        """
+        SELECT
+            station_id,
+            measured_at,
+            received_at,
+            temperature_c,
+            humidity_pct,
+            pressure_hpa
+        FROM weather_readings
+        WHERE measured_at >= %s
+          AND measured_at <= %s
+        ORDER BY measured_at ASC;
+        """,
+        (from_dt, to_dt)
+    )
+
+    rows = cursor.fetchall()
+
+    if not rows:
+        return {
+            "data": [],
+            "count": 0
+        }, 200
+
+    result = []
+    for row in rows:
+        result.append({
+            "station_id": row[0],
+            "measured_at": row[1].isoformat(),
+            "received_at": row[2].isoformat(),
+            "temperature_c": float(row[3]) if row[3] is not None else None,
+            "humidity_pct": float(row[4]) if row[4] is not None else None,
+            "pressure_hpa": float(row[5]) if row[5] is not None else None,
+        })
+
+    return {
+        "count": len(result),
+        "data": result
+    }, 200
