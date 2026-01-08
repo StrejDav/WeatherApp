@@ -4,6 +4,7 @@ import json
 import psycopg2
 import os
 import time
+from dateutil import parser
 
 DB_CONFIG = {
     "host": os.environ["DB_HOST"],
@@ -81,4 +82,65 @@ def latest():
 
 @app.route("/range", methods=['GET'])
 def range():
-    return "[Requested range weather data here]"
+    from_ts = request.args.get("from")
+    to_ts = request.args.get("to")
+
+    if not from_ts or not to_ts:
+        return {
+            "error": "Both 'from' and 'to' query parameters are required"
+        }, 400
+
+    try:
+        # Parse ISO 8601 timestamps with timezone
+        from_dt = parser.isoparse(from_ts)
+        to_dt = parser.isoparse(to_ts)
+    except (ValueError, TypeError):
+        return {
+            "error": "Invalid timestamp format. Use ISO 8601 with timezone."
+        }, 400
+
+    if from_dt >= to_dt:
+        return {
+            "error": "'from' must be earlier than 'to'"
+        }, 400
+
+    cursor.execute(
+        """
+        SELECT
+            station_id,
+            measured_at,
+            received_at,
+            temperature_c,
+            humidity_pct,
+            pressure_hpa
+        FROM weather_readings
+        WHERE measured_at >= %s
+          AND measured_at <= %s
+        ORDER BY measured_at ASC;
+        """,
+        (from_dt, to_dt)
+    )
+
+    rows = cursor.fetchall()
+
+    if not rows:
+        return {
+            "data": [],
+            "count": 0
+        }, 200
+
+    result = []
+    for row in rows:
+        result.append({
+            "station_id": row[0],
+            "measured_at": row[1].isoformat(),
+            "received_at": row[2].isoformat(),
+            "temperature_c": float(row[3]) if row[3] is not None else None,
+            "humidity_pct": float(row[4]) if row[4] is not None else None,
+            "pressure_hpa": float(row[5]) if row[5] is not None else None,
+        })
+
+    return {
+        "count": len(result),
+        "data": result
+    }, 200
