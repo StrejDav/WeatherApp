@@ -26,6 +26,17 @@ resource "aws_subnet" "subnet_private" {
   }
 }
 
+resource "aws_db_subnet_group" "subnet_db" {
+  name        = "weatherapp-subnet-group-db"
+  description = "Subnet group for RDS for WeatherApp"
+
+  subnet_ids = [aws_subnet.subnet_private.id]
+
+  tags = {
+    Name = "weatherapp-subnet-private"
+  }
+}
+
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
@@ -58,9 +69,9 @@ resource "aws_route_table_association" "rt_public_assoc" {
 }
 
 resource "aws_security_group" "sg_internet_facing" {
-  name = "allow-http-ssh"
+  name        = "allow-http-ssh"
   description = "Allows inbound HTTP and SSH and all outbound traffic"
-  vpc_id = aws_vpc.main.id
+  vpc_id      = aws_vpc.main.id
 
   ingress {
     from_port   = 80
@@ -77,13 +88,37 @@ resource "aws_security_group" "sg_internet_facing" {
   }
 
   egress {
-    from_port        = 0
-    to_port          = 0
-    protocol         = "-1"
-    cidr_blocks      = ["0.0.0.0/0"]
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
     Name = "weatherapp-sg-internet-facing"
+  }
+}
+
+resource "aws_security_group" "sg_db_internal" {
+  name        = "allow-postgres"
+  description = "Allows PostgreSQL traffic from inside the private subnet"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_subnet.subnet_private.cidr_block]
+  }
+
+  egress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [aws_subnet.subnet_private.cidr_block]
+  }
+
+  tags = {
+    Name = "weatherapp-sg-postgres-internal"
   }
 }
