@@ -68,9 +68,27 @@ resource "aws_route_table" "rt_public" {
   }
 }
 
+resource "aws_route_table" "rt_private" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "weatherapp-rt-private"
+  }
+}
+
 resource "aws_route_table_association" "rt_public_assoc" {
   subnet_id      = aws_subnet.subnet_public.id
   route_table_id = aws_route_table.rt_public.id
+}
+
+resource "aws_route_table_association" "rt_private_assoc_a" {
+  subnet_id      = aws_subnet.subnet_private_a.id
+  route_table_id = aws_route_table.rt_private.id
+}
+
+resource "aws_route_table_association" "rt_private_assoc_b" {
+  subnet_id      = aws_subnet.subnet_private_b.id
+  route_table_id = aws_route_table.rt_private.id
 }
 
 resource "aws_security_group" "sg_internet_facing" {
@@ -85,6 +103,7 @@ resource "aws_security_group" "sg_internet_facing" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # !!! Accepting SSH traffic from anywhere should be removed in future
   ingress {
     from_port   = 22
     to_port     = 22
@@ -113,7 +132,6 @@ resource "aws_security_group" "sg_db_internal" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    # cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
     security_groups = [ aws_security_group.sg_internet_facing.id ]
   }
 
