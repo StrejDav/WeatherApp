@@ -1,3 +1,5 @@
 .venv
 .obsidian
 __pycache__
+.terraform*
+terraform.tfstate*
