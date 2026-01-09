@@ -14,7 +14,7 @@ data "aws_ami" "ubuntu" {
 }
 
 data "aws_kms_key" "db_key" {
-  key_id = "arn:aws:kms:eu-north-1:361966322279:key/3bba199d-531d-4069-ab0e-bd873d03240b"
+  key_id = "arn:aws:kms:eu-north-1:361966322279:key/054e0fe1-07f9-4074-b21b-8c01533beec1"
 }
 
 resource "aws_instance" "app_server" {
