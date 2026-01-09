@@ -16,13 +16,23 @@ resource "aws_subnet" "subnet_public" {
   }
 }
 
-resource "aws_subnet" "subnet_private" {
+resource "aws_subnet" "subnet_private_a" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = "eu-north-1a"
 
   tags = {
-    Name = "weatherapp-subnet-private"
+    Name = "weatherapp-subnet-private-a"
+  }
+}
+
+resource "aws_subnet" "subnet_private_b" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "eu-north-1b"
+
+  tags = {
+    Name = "weatherapp-subnet-private-b"
   }
 }
 
@@ -30,7 +40,7 @@ resource "aws_db_subnet_group" "subnet_db" {
   name        = "weatherapp-subnet-group-db"
   description = "Subnet group for RDS for WeatherApp"
 
-  subnet_ids = [aws_subnet.subnet_private.id]
+  subnet_ids = [aws_subnet.subnet_private_a.id, aws_subnet.subnet_private_b.id]
 
   tags = {
     Name = "weatherapp-subnet-private"
@@ -108,14 +118,14 @@ resource "aws_security_group" "sg_db_internal" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private.cidr_block]
+    cidr_blocks = [aws_subnet.subnet_private_a.id, aws_subnet.subnet_private_b.id]
   }
 
   egress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private.cidr_block]
+    cidr_blocks = [aws_subnet.subnet_private_a.id, aws_subnet.subnet_private_b.id]
   }
 
   tags = {
