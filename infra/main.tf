@@ -44,7 +44,6 @@ resource "aws_db_instance" "default" {
   engine_version                = "18.1"
   instance_class                = "db.t3.micro"
   username                      = "postgres"
-  skip_final_snapshot           = true
   manage_master_user_password   = true
   master_user_secret_kms_key_id = data.aws_kms_key.db_key.key_id
 }

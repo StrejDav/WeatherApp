@@ -59,11 +59,6 @@ resource "aws_route_table" "rt_public" {
   vpc_id = aws_vpc.main.id
 
   route {
-    cidr_block = aws_vpc.main.cidr_block
-    gateway_id = "local"
-  }
-
-  route {
     cidr_block = "0.0.0.0/0"
     gateway_id = aws_internet_gateway.igw.id
   }
@@ -118,14 +113,8 @@ resource "aws_security_group" "sg_db_internal" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
-  }
-
-  egress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
+    # cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
+    security_groups = [ aws_security_group.sg_internet_facing.id ]
   }
 
   tags = {
