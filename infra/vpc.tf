@@ -118,14 +118,14 @@ resource "aws_security_group" "sg_db_internal" {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private_a.id, aws_subnet.subnet_private_b.id]
+    cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
   }
 
   egress {
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
-    cidr_blocks = [aws_subnet.subnet_private_a.id, aws_subnet.subnet_private_b.id]
+    cidr_blocks = [aws_subnet.subnet_private_a.cidr_block, aws_subnet.subnet_private_b.cidr_block]
   }
 
   tags = {
